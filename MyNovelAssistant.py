@@ -3,6 +3,7 @@ import re
 import anthropic
 import openai
 from mistralai import Mistral
+import google.generativeai as genai
 from dotenv import load_dotenv
 
 class MyNovelAssistant:
@@ -109,6 +110,23 @@ class MyNovelAssistant:
             temperature=0.7
         )
         return response.choices[0].message.content
+
+    def runWithGemini(self):
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+        prompt = f"{self.system_prompt}\n\n"
+        for message in self.messages:
+            prompt += f"{message['role']}: {message['content']}\n"
+        prompt += f"user: {self.task}"
+        
+        response = genai.GenerativeModel('gemini-2.5-pro-exp-03-25').generate_content(
+            prompt,
+            generation_config={
+                "max_output_tokens": 5300,
+                "temperature": 0.7
+            }
+        )
+        return response.text
 
     def debugMessages(self):
         for message in self.messages:
