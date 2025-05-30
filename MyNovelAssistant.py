@@ -1,0 +1,124 @@
+import os
+import re
+import anthropic
+import openai
+from mistralai import Mistral
+from dotenv import load_dotenv
+
+class MyNovelAssistant:
+
+    def __init__(self, api_choice="anthropic"):
+        self.files = {}
+        self.system_prompt = ""
+        self.task = ""
+        self.messages = []
+        load_dotenv()
+
+    def setSystemPrompt(self, system_prompt):
+        self.system_prompt = system_prompt
+
+    def setTask(self, task):
+        self.task = task
+
+    def get_chapter_files(self, directory, pattern=r"chapter(\d+)_the_[_a-z]+\.txt"):
+        return {
+            int(re.search(pattern, f).group(1)): f
+            for f in os.listdir(directory)
+            if re.match(pattern, f)
+        }
+
+    def load_all_chapters(self, directory, custom_lambda=None):
+        files = self.get_chapter_files(directory)
+
+        if custom_lambda:
+            files = custom_lambda(files)
+
+        # this changes the contents of the files dictionary
+        for chapter_number, filename in files.items():
+            print(f"Reading chapter {chapter_number}...", files[chapter_number])
+            with open(os.path.join(directory, files[chapter_number]), "r", encoding="utf-8") as f:
+                files[chapter_number] = f.read()
+
+        for chapter_number in sorted(files.keys()):
+            print(f"Adding chapter {chapter_number}...")
+            self.messages.extend([
+                {"role": "user", "content": f"Here is chapter {chapter_number}:\n\n{files[chapter_number]}"},
+                {"role": "assistant", "content": f"I have chapter {chapter_number}."}
+            ])
+
+    def load_summaries(self, directory, custom_lambda=None):
+        files = {
+            int(re.search(r"chapter(\d+)_summary.txt", f).group(1)): f
+            for f in os.listdir(directory)
+            if re.match(r"chapter\d+_summary.txt", f)
+        }
+
+        if custom_lambda:
+            files = custom_lambda(files)
+
+        # this changes the contents of the files dictionary
+        for chapter_number, filename in files.items():
+            print(f"Reading chapter {chapter_number}...", files[chapter_number])
+            with open(os.path.join(directory, files[chapter_number]), "r", encoding="utf-8") as f:
+                files[chapter_number] = f.read()
+
+        for chapter_number in sorted(files.keys()):
+            self.messages.extend([
+                {"role": "user", "content": f"Here is a summary for chapter {chapter_number}:\n\n{files[chapter_number]}"},
+                {"role": "assistant", "content": f"I have the summary for chapter {chapter_number}."}
+            ])
+
+    def runWithClaude(self):
+        # Create a local copy of messages
+        messages = self.messages + [{"role": "user", "content": self.task}]
+
+        response = anthropic.Anthropic().messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=5300,
+            temperature=0.7,
+            system=self.system_prompt,
+            messages=messages
+        )
+        return response.content[0].text
+
+    def runWithChatGPT(self):
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+
+        # Create a local copy of messages
+        messages = [{"role": "system", "content": self.system_prompt}] + self.messages
+        messages.append({"role": "user", "content": self.task})
+
+        response = openai.Client().chat.completions.create(
+            model="chatgpt-4o-latest",
+            messages=messages,
+            max_tokens=5300,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+
+    def runWithMistral(self):
+        client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+
+        messages = [{"role": "system", "content": self.system_prompt}] + self.messages
+        messages.append({"role": "user", "content": self.task})
+
+        response = client.chat.complete(
+            model="mistral-large-latest",
+            messages=messages,
+            max_tokens=5300,
+            temperature=0.7
+        )
+        return response.choices[0].message.content
+
+    def debugMessages(self):
+        for message in self.messages:
+            print(message)
+
+    def addFile(self, filename, message):
+        with open(filename, "r", encoding="utf-8") as f:
+            contents = f.read()
+
+        self.messages.extend([
+            {"role": "user", "content": message+"\n\n"+contents},
+            {"role": "assistant", "content": "Okay, got it."}
+        ])
