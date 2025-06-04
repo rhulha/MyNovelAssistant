@@ -119,7 +119,7 @@ class MyNovelAssistant:
             prompt += f"{message['role']}: {message['content']}\n"
         prompt += f"user: {self.task}"
         
-        response = genai.GenerativeModel('gemini-2.5-pro-exp-03-25').generate_content(
+        response = genai.GenerativeModel('gemini-2.5-pro-preview-03-25').generate_content(
             prompt,
             generation_config={
                 "max_output_tokens": 5300,
