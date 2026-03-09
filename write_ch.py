@@ -24,7 +24,7 @@ response = assistant.runWithGemini() # runWithClaude()  # Or use `runWithChatGPT
 
 output_file = "ch10_ai.txt"
 
-with open(output_file, "w", encoding="utf-8") as brainstorm_file:
-    brainstorm_file.write(response)
+with open(output_file, "w", encoding="utf-8") as _:
+    _.write(response)
 
 print(f"Saved to {output_file}.")
