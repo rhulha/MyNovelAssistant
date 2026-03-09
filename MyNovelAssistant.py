@@ -1,5 +1,6 @@
 import os
 import re
+from pathlib import Path
 import anthropic
 import openai
 from mistralai import Mistral
@@ -8,7 +9,7 @@ from dotenv import load_dotenv
 
 class MyNovelAssistant:
 
-    def __init__(self, api_choice="anthropic"):
+    def __init__(self):
         self.files = {}
         self.system_prompt = ""
         self.task = ""
@@ -140,3 +141,33 @@ class MyNovelAssistant:
             {"role": "user", "content": message+"\n\n"+contents},
             {"role": "assistant", "content": "Okay, got it."}
         ])
+
+    def text_to_speech(self, text, output_path, voice="onyx", max_chars=2000):
+        sentences = re.split(r'(?<=[.!?])\s+', text)
+        chunks = []
+        chunk = ''
+        for sentence in sentences:
+            if len(chunk) + len(sentence) > max_chars:
+                chunks.append(chunk)
+                chunk = sentence
+            else:
+                chunk = (chunk + ' ' + sentence).strip()
+        if chunk:
+            chunks.append(chunk)
+
+        client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        output_path = Path(output_path)
+
+        part_files = []
+        for i, chunk in enumerate(chunks, start=1):
+            response = client.audio.speech.create(
+                model='gpt-4o-mini-tts',
+                voice=voice,
+                input=chunk,
+            )
+            part_path = output_path.parent / f"{output_path.stem}_part{i}.mp3"
+            part_path.write_bytes(response.content)
+            part_files.append(part_path)
+            print(f"Saved {part_path.name}")
+
+        return part_files
